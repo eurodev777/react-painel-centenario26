@@ -866,6 +866,24 @@ export default function App() {
             ) : (
               // Standard View: Displays Active Category Teams List
               <div className="space-y-6">
+                {/* AÇÕES GLOBAIS DO PAINEL - aparecem mesmo sem categoria */}
+                <div className="flex items-center justify-end gap-2 flex-wrap">
+                  <button
+                    onClick={() => setIsGaleriaOpen(true)}
+                    className="flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+                  >
+                    <Image className="w-4 h-4" />
+                    <span>Galeria de Fotos</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsAdminView(false)}
+                    className="bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Sair do Painel
+                  </button>
+                </div>
+
                 {/* Active Category Title and Quick Actions */}
                 {activeCategoryObj && (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-2xl border border-stone-200/80 shadow-xs">
@@ -891,7 +909,6 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* SEU NOVO BOTÃO DE CHAVES AQUI */}
                       <button
                         onClick={() => setIsChavesOpen(true)}
                         className="flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
@@ -900,28 +917,12 @@ export default function App() {
                         <span>Formulário de Chaves</span>
                       </button>
 
-                      {/* SEU NOVO BOTÃO DE CHAVES AQUI */}
-                      <button
-                        onClick={() => setIsGaleriaOpen(true)}
-                        className="flex items-center gap-1.5 bg-stone-900 hover:bg-stone-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
-                      >
-                        <Image className="w-4 h-4" />
-                        <span>Galeria de Fotos</span>
-                      </button>
-
                       <button
                         onClick={adicionarEquipeLocal}
                         className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-md shadow-red-500/5 cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
                         <span>Adicionar Equipe</span>
-                      </button>
-
-                      <button
-                        onClick={() => setIsAdminView(false)}
-                        className="bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
-                      >
-                        Sair do Painel
                       </button>
                     </div>
                   </div>
