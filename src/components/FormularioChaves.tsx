@@ -48,7 +48,7 @@ export default function FormularioChaves({ onClose }: FormularioChavesProps) {
   }, []);
 
   const carregarImagens = async () => {
-    const res = await fetch(
+    const res = await fetch( 
       "https://sothink.com.br/centenario26/api/v2/nippon/list-images"
     );
 
