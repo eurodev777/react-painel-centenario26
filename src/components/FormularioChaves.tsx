@@ -1,222 +1,359 @@
-import React, { useState, useEffect } from "react";
-import { X, Upload, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+
+const API_URL =
+  "https://sothink.com.br/centenario26/api/v2/nippon";
+
+const TABELA = "chaves";
 
 interface FormularioChavesProps {
   onClose: () => void;
 }
 
-export default function FormularioChaves({ onClose }: FormularioChavesProps) {
-  const CAMPOS = [
-    {
-      id: 1,
-      titulo: "Ouro Masculino",
-      campo: "image_1",
-    },
-    {
-      id: 2,
-      titulo: "Prata Masculino",
-      campo: "image_2",
-    },
-    {
-      id: 3,
-      titulo: "Bronze Masculino",
-      campo: "image_3",
-    },
-    {
-      id: 4,
-      titulo: "Ouro Feminino",
-      campo: "image_4",
-    },
-    {
-      id: 5,
-      titulo: "Prata Feminino",
-      campo: "image_5",
-    },
-  ];
-  // Estado para controlar o loading e status de cada um dos 5 inputs individualmente
-  const [inputs, setInputs] = useState(
-    Array.from({ length: 5 }, (_, i) => ({
-      id: i + 1,
-      loading: false,
-      status: "idle" as "idle" | "success" | "error",
-      urlSalva: "",
-    }))
-  );
+interface ImagemChave {
+  id: number;
+  imagem: string;
+}
+
+export default function FormularioChaves({
+  onClose,
+}: FormularioChavesProps) {
+  const [imagens, setImagens] = useState<ImagemChave[]>([]);
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+
+  // =====================================================
+  // LISTAR TODAS AS IMAGENS
+  // =====================================================
+
+  const carregarImagens = async () => {
+    try {
+      setCarregando(true);
+
+      const res = await fetch(`${API_URL}/list-images`);
+
+      const data = await res.json();
+
+      console.log("LISTAGEM CHAVES:", data);
+
+      if (data.sucesso) {
+        setImagens(data.dados || []);
+      } else {
+        console.error("Erro ao listar:", data.erro);
+        setImagens([]);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar imagens:", error);
+      setImagens([]);
+    } finally {
+      setCarregando(false);
+    }
+  };
 
   useEffect(() => {
     carregarImagens();
   }, []);
 
-  const carregarImagens = async () => {
-    const res = await fetch( 
-      "https://sothink.com.br/centenario26/api/v2/nippon/list-images"
-    );
+  // =====================================================
+  // ADICIONAR NOVA IMAGEM
+  // =====================================================
 
-    const data = await res.json();
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    const registro = data[0];
+    if (!arquivo) {
+      alert("Selecione uma imagem!");
+      return;
+    }
 
-    if (!registro) return;
-
-    setInputs((prev) =>
-      prev.map((item) => ({
-        ...item,
-        urlSalva: registro[`image_${item.id}`] || "",
-      }))
-    );
-  };
-
-  const handleUploadImagem = async (index: number, file: File | null) => {
-    if (!file) return;
-
-    // Atualiza o estado daquele input específico para "loading"
-    atualizarEstadoInput(index, { loading: true, status: "idle" });
+    setLoading(true);
 
     const formData = new FormData();
-    formData.append("tabela", "chaves");
-    formData.append(`image_${index + 1}`, file);
+
+    formData.append("tabela", TABELA);
+
+    // AGORA É SOMENTE "imagem"
+    // NÃO EXISTE MAIS image_1, image_2, image_3...
+    formData.append("imagem", arquivo);
 
     try {
-      // Substitua pelo endpoint correto da sua API PHP que processa o upload
-      const response = await fetch(
-        "https://sothink.com.br/centenario26/api/v2/nippon/images",
-        {
-          method: "POST",
-          body: formData,
+      const res = await fetch(`${API_URL}/images`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const texto = await res.text();
+
+      console.log("UPLOAD CHAVE:", texto);
+
+      let data;
+
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        throw new Error("API retornou resposta inválida.");
+      }
+
+      if (data.sucesso) {
+        alert("Imagem adicionada com sucesso!");
+
+        setArquivo(null);
+
+        const input = document.getElementById(
+          "fileInputChaves"
+        ) as HTMLInputElement | null;
+
+        if (input) {
+          input.value = "";
         }
-      );
 
-      const resTexto = await response.text();
-      console.log(`[Upload Imagem ${index + 1}]:`, resTexto);
-
-      if (!response.ok) throw new Error("Erro no servidor");
-
-      const resJson = JSON.parse(resTexto);
-
-      if (resJson.sucesso) {
-        atualizarEstadoInput(index, {
-          loading: false,
-          status: "success",
-          urlSalva: resJson.url_imagem || "", // URL retornada pela sua API PHP
-        });
+        // BUSCA NOVAMENTE TODAS DO BANCO
+        await carregarImagens();
       } else {
-        throw new Error(resJson.erro || "Falha ao salvar");
+        alert("Erro: " + (data.erro || "Erro ao adicionar imagem."));
       }
     } catch (error) {
       console.error(error);
-      atualizarEstadoInput(index, { loading: false, status: "error" });
+
+      alert("Erro ao enviar imagem.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const atualizarEstadoInput = (
-    index: number,
-    novosValores: Partial<(typeof inputs)[0]>
-  ) => {
-    setInputs((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, ...novosValores } : item))
+  // =====================================================
+  // DELETAR IMAGEM
+  // =====================================================
+
+  const handleDeletar = async (id: number) => {
+    const confirmar = window.confirm(
+      "Tem certeza que deseja deletar esta imagem?"
     );
+
+    if (!confirmar) return;
+
+    const formData = new FormData();
+
+    formData.append("tabela", TABELA);
+    formData.append("id", id.toString());
+
+    try {
+      const res = await fetch(`${API_URL}/delete-images`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const texto = await res.text();
+
+      console.log("DELETAR CHAVE:", texto);
+
+      let data;
+
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        throw new Error("API retornou resposta inválida.");
+      }
+
+      if (data.sucesso) {
+        await carregarImagens();
+      } else {
+        alert("Erro ao deletar: " + (data.erro || "Erro desconhecido."));
+      }
+    } catch (error) {
+      console.error(error);
+
+      alert("Erro ao deletar imagem.");
+    }
+  };
+
+  // =====================================================
+  // URL DA IMAGEM
+  // =====================================================
+
+  const montarUrlImagem = (imagem: string) => {
+    if (
+      imagem.startsWith("http://") ||
+      imagem.startsWith("https://")
+    ) {
+      return imagem;
+    }
+
+    return `https://sothink.com.br/centenario26/${imagem.replace(
+      /^\/+/,
+      ""
+    )}`;
   };
 
   return (
-    <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-stone-200 w-full max-w-xl p-6 relative max-h-[90vh] overflow-y-auto">
-        {/* Header do Modal */}
-        <div className="flex items-center justify-between border-b border-stone-100 pb-4 mb-6">
-          <div>
-            <h3 className="text-xl font-bold font-display text-stone-950">
-              Upload de Chaves do Torneio
-            </h3>
-            <p className="text-xs text-stone-400 mt-0.5">
-              Cada campo realiza 1 insert individual diretamente no banco de
-              dados.
-            </p>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="w-full max-w-4xl bg-white rounded-xl shadow-2xl p-6 relative max-h-[95vh] overflow-y-auto">
+
+        {/* HEADER */}
+
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Gerenciar Chaves
+          </h2>
+
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 hover:bg-stone-100 rounded-full text-stone-400 hover:text-stone-700 transition"
+            className="text-gray-400 hover:text-gray-700 text-2xl font-bold"
           >
-            <X className="w-5 h-5" />
+            ×
           </button>
         </div>
 
-        {/* Form Grid com os 5 Inputs */}
-        <div className="space-y-4">
-          {inputs.map((input, index) => (
-            <div
-              key={input.id}
-              className="p-4 bg-stone-50 rounded-2xl border border-stone-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-            >
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-stone-800">
-                  {
-                    [
-                      "Ouro Masculino",
-                      "Prata Masculino",
-                      "Bronze Masculino",
-                      "Ouro Feminino",
-                      "Prata Feminino",
-                    ][index]
-                  }
-                </span>
-                {input?.urlSalva ? (
-                  <img
-                    src={`https://sothink.com.br/centenario26/${input.urlSalva}`}
-                    className="w-40 h-24 object-cover rounded-lg border"
-                    alt={`Imagem ${input.id}`}
-                  />
-                ) : (
-                  <div className="w-40 h-24 rounded-lg border bg-stone-100 flex items-center justify-center text-xs text-stone-400">
-                    Sem imagem
-                  </div>
-                )}
+        {/* FORMULÁRIO PARA ADICIONAR */}
+
+        <form
+          onSubmit={handleUpload}
+          className="flex flex-col sm:flex-row gap-4 mb-8 items-center border-b pb-6"
+        >
+          <input
+            id="fileInputChaves"
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            onChange={(e) =>
+              setArquivo(
+                e.target.files && e.target.files.length > 0
+                  ? e.target.files[0]
+                  : null
+              )
+            }
+            className="
+              block
+              w-full
+              text-sm
+              text-gray-500
+
+              file:mr-4
+              file:py-2
+              file:px-4
+              file:rounded-md
+              file:border-0
+              file:text-sm
+              file:font-semibold
+              file:bg-blue-50
+              file:text-blue-700
+
+              hover:file:bg-blue-100
+              cursor-pointer
+            "
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="
+              bg-blue-600
+              hover:bg-blue-700
+              text-white
+              font-bold
+              py-2
+              px-6
+              rounded-md
+              disabled:opacity-50
+              whitespace-nowrap
+            "
+          >
+            {loading ? "Enviando..." : "Adicionar"}
+          </button>
+        </form>
+
+        {/* CARREGANDO */}
+
+        {carregando && (
+          <div className="py-10 text-center text-gray-500">
+            Carregando imagens...
+          </div>
+        )}
+
+        {/* LISTA DAS IMAGENS */}
+
+        {!carregando && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {imagens.map((item) => (
+              <div
+                key={item.id}
+                className="
+                  relative
+                  group
+                  rounded-lg
+                  overflow-hidden
+                  border
+                  shadow-sm
+                  aspect-[9/16]
+                  bg-gray-100
+                "
+              >
+                <img
+                  src={montarUrlImagem(item.imagem)}
+                  alt={`Chave ${item.id}`}
+                  className="w-full h-full object-cover"
+                />
+
+                {/* OVERLAY */}
+
+                <div
+                  className="
+                    absolute
+                    inset-0
+                    bg-black/40
+                    opacity-0
+                    group-hover:opacity-100
+                    transition-opacity
+                    flex
+                    items-center
+                    justify-center
+                  "
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleDeletar(item.id)}
+                    className="
+                      bg-red-500
+                      hover:bg-red-600
+                      text-white
+                      font-bold
+                      py-2
+                      px-4
+                      rounded
+                    "
+                  >
+                    Deletar
+                  </button>
+                </div>
               </div>
+            ))}
 
-              <div className="flex items-center gap-3 shrink-0">
-                {/* Status indicator do input atual */}
-                {input.loading && (
-                  <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Enviando...</span>
-                  </div>
-                )}
-                {input.status === "success" && (
-                  <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Salvo!</span>
-                  </div>
-                )}
-                {input.status === "error" && (
-                  <div className="flex items-center gap-1.5 text-xs text-amber-600 font-bold">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Erro ao enviar</span>
-                  </div>
-                )}
+            {imagens.length === 0 && (
+              <p className="text-gray-500 col-span-2 md:col-span-4">
+                Nenhuma imagem nas chaves ainda.
+              </p>
+            )}
+          </div>
+        )}
 
-                {/* Input customizado estilo botão */}
-                <label className="flex items-center gap-2 bg-white border border-stone-200 hover:border-stone-400 text-stone-700 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-xs">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Selecionar Foto</span>
-                  <input
-                    type="file"
-                    name={`image_${index + 1}`}
-                    accept="image/*"
-                    className="hidden"
-                    disabled={input.loading}
-                    onChange={(e) =>
-                      handleUploadImagem(index, e.target.files?.[0] || null)
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* FOOTER */}
 
-        {/* Footer */}
         <div className="mt-8 pt-4 border-t border-stone-100 flex justify-end">
           <button
+            type="button"
             onClick={onClose}
-            className="bg-stone-950 hover:bg-stone-900 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+            className="
+              bg-stone-950
+              hover:bg-stone-900
+              text-white
+              px-6
+              py-2.5
+              rounded-xl
+              text-xs
+              font-bold
+              transition
+              cursor-pointer
+            "
           >
             Concluir e Fechar
           </button>
